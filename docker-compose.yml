@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  replicate-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/twynity_mcp}
+      - DATABASE_NAME=twynity_mcp
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - ACCOUNT_SERVICE_URL=${ACCOUNT_SERVICE_URL:-http://localhost:8081}
+      - ACCOUNT_SERVICE_JWKS_ENDPOINT=/oauth2/keys
+      - LICENSE_KEY=${LICENSE_KEY:-dev-license-key}
+      - LICENSE_SERVER_BASE_URL=${LICENSE_SERVER_BASE_URL:-http://localhost:8082}
+      - USAGE_REPORT_ENDPOINT=${USAGE_REPORT_ENDPOINT:-http://localhost:8090/api/v1/report}
+      - ENVIRONMENT=development
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=twynity_mcp
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongodb_data:

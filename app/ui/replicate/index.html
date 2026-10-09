@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Replicate MCP App - Twynity</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        header { text-align: center; padding: 2rem 0; border-bottom: 1px solid #30363d; }
+        h1 { color: #58a6ff; font-size: 2rem; margin-bottom: 0.5rem; }
+        .subtitle { color: #8b949e; }
+        .section { margin: 2rem 0; }
+        .section-title { color: #7ee787; font-size: 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
+        .status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.875rem; font-weight: 500; }
+        .status-connected { background: #1a4731; color: #7ee787; }
+        .status-disconnected { background: #451919; color: #f85149; }
+        .form-group { margin: 1rem 0; }
+        label { display: block; color: #8b949e; margin-bottom: 0.5rem; font-size: 0.875rem; }
+        input, select, textarea { width: 100%; padding: 0.75rem; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-family: 'Monaco', 'Menlo', monospace; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #58a6ff; }
+        button { background: #238636; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: 500; transition: background 0.2s; }
+        button:hover { background: #2ea043; }
+        button:disabled { background: #30363d; color: #8b949e; cursor: not-allowed; }
+        .btn-secondary { background: #21262d; }
+        .btn-secondary:hover { background: #30363d; }
+        .search-input { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .model-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        .model-card { border: 1px solid #30363d; border-radius: 6px; padding: 1rem; cursor: pointer; transition: border-color 0.2s; }
+        .model-card:hover { border-color: #58a6ff; }
+        .model-card.selected { border-color: #58a6ff; background: rgba(88, 166, 255, 0.1); }
+        .model-id { color: #7ee787; font-size: 0.875rem; word-break: break-all; }
+        .model-name { color: #c9d1d9; font-weight: 600; margin: 0.25rem 0; }
+        .model-desc { color: #8b949e; font-size: 0.875rem; }
+        .prediction-history { max-height: 400px; overflow-y: auto; }
+        .prediction-item { border-bottom: 1px solid #30363d; padding: 1rem; }
+        .prediction-item:last-child { border-bottom: none; }
+        .prediction-meta { display: flex; gap: 1rem; font-size: 0.875rem; color: #8b949e; margin-top: 0.5rem; }
+        .code-block { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.875rem; }
+        .output-preview { color: #58a6ff; word-break: break-all; }
+        .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid #c9d1d9; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .alert { padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .alert-error { background: rgba(248, 81, 73, 0.1); border: 1px solid #f85149; color: #f85149; }
+        .alert-success { background: rgba(112, 231, 111, 0.1); border: 1px solid #7ee787; color: #7ee787; }
+        .loader-overlay { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .loader { text-align: center; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Loader -->
+        <div id="loader" class="loader-overlay">
+            <div class="loader">
+                <div class="spinner" style="width: 3rem; height: 3rem;"></div>
+                <p style="margin-top: 1rem; color: #58a6ff;">Loading Replicate MCP App...</p>
+            </div>
+        </div>
+
+        <div id="content" class="container hidden">
+            <header>
+                <h1>Replicate AI Model Platform</h1>
+                <p class="subtitle">Connected to Twynity • Search, execute, and monitor AI models via Replicate API</p>
+            </header>
+
+            <!-- Connection Status -->
+            <div class="section">
+                <h2 class="section-title">🔐 Connection Status</h2>
+                <div id="connection-status" class="card">
+                    <span id="status-badge" class="status-badge status-disconnected">Connecting...</span>
+                    <p id="connection-message" style="margin-top: 0.5rem; color: #8b949e;">Initializing connection to Replicate API...</p>
+                </div>
+            </div>
+
+            <!-- Model Search -->
+            <div id="search-section" class="section hidden">
+                <h2 class="section-title">🔍 Model Discovery</h2>
+                
+                <div class="card">
+                    <div class="form-group">
+                        <label>Search Models</label>
+                        <input type="text" id="search-query" placeholder="e.g. 'image generation', 'text to speech'..." />
+                    </div>
+                    <button id="btn-search" onclick="searchModels()">Search Models</button>
+                </div>
+
+                <div id="model-results" class="model-list hidden"></div>
+            </div>
+
+            <!-- Model Details & Execution -->
+            <div id="execution-section" class="section hidden">
+                <h2 class="section-title">⚡ Prediction Execution</h2>
+
+                <div id="model-details" class="card">
+                    <h3 id="detail-model-id" class="model-id"></h3>
+                    <h4 id="detail-model-name" class="model-name"></h4>
+                    <p id="detail-description" class="model-desc"></p>
+                </div>
+
+                <form id="execution-form" class="card">
+                    <div id="dynamic-inputs"></div>
+                    <button type="submit" id="btn-run-prediction">Run Model</button>
+                </form>
+            </div>
+
+            <!-- Prediction Status -->
+            <div id="prediction-status-section" class="section hidden">
+                <h2 class="section-title">📊 Active Predictions</h2>
+                
+                <div class="card">
+                    <div class="search-input">
+                        <input type="text" id="prediction-id-input" placeholder="Enter prediction ID to check status" />
+                        <button onclick="checkPredictionStatus()">Check Status</button>
+                    </div>
+
+                    <div id="prediction-status-result"></div>
+                </div>
+
+                <h3 style="color: #8b949e; margin: 1.5rem 0 1rem;">Recent History</h3>
+                <div id="recent-predictions" class="card prediction-history">
+                    <p style="color: #8b949e;">No predictions yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // App state
+        let state = {
+            connectionStatus: 'unknown',
+            apiKeyToken: null,
+            selectedModel: null,
+            recentPredictions: []
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkConnection();
+            setupEventListeners();
+        });
+
+        function showLoader() {
+            document.getElementById('loader').classList.remove('hidden');
+        }
+
+        function hideLoader() {
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+        }
+
+        // Check connection status
+        async function checkConnection() {
+            try {
+                const response = await fetch('/api/v1/replicate/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    state.selectedModel = true; // Enable search
+                    
+                    document.getElementById('status-badge').className = 'status-badge status-connected';
+                    document.getElementById('status-badge').textContent = '🟢 Connected';
+                    document.getElementById('connection-message').textContent = 
+                        `Replicate API accessible at ${data.endpoint}`;
+                    
+                    document.getElementById('search-section').classList.remove('hidden');
+                    showPredictionSectionIfReady();
+                } else {
+                    throw new Error('Connection failed');
+                }
+            } catch (error) {
+                document.getElementById('status-badge').className = 'status-badge status-disconnected';
+                document.getElementById('status-badge').textContent = '⚠️ Connection needed';
+                document.getElementById('connection-message').textContent = 
+                    'Valid API token required. MCP host will authenticate automatically.';
+            }
+            hideLoader();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('search-query').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') searchModels();
+            });
+            
+            document.getElementById('execution-form').addEventListener('submit', handlePredictionSubmit);
+        }
+
+        async function searchModels() {
+            const query = document.getElementById('search-query').value.trim();
+            if (!query) return;
+
+            showLoader();
+            
+            try {
+                // Search via MCP tool - simulated for UI demo
+                const toolsResponse = await fetch('/api/v1/manifest');
+                const manifest = await toolsResponse.json();
+                
+                const searchResults = document.getElementById('model-results');
+                searchResults.innerHTML = renderSearchResults(createMockResults(query));
+                searchResults.classList.remove('hidden');
+            } catch (error) {
+                showAlert('Search failed: ' + error.message, 'error');
+            }
+            
+            hideLoader();
+        }
+
+        function createMockResults(query) {
+            const mockModels = [
+                { id: 'stability-ai/stable-diffusion', name: 'Stable Diffusion', description: 'Text-to-image generation model' },
+                { id: 'meta/llama-2-70b-chat', name: 'Llama 2 70B Chat', description: 'Large language model for chatbot applications' },
+                { id: 'replicate/anyscale-llama-2-13b-chat', name: 'Anyscale Llama 2 13B', description: 'Efficient language model inference' },
+                { id: 'stable-audio/stable-audio-open', name: 'Stable Audio Open', description: 'AI music generation and audio synthesis' }
+            ];
+            
+            return mockModels.filter(m => 
+                m.name.toLowerCase().includes(query.toLowerCase()) || 
+                m.description.toLowerCase().includes(query.toLowerCase())
+            );
+        }
+
+        function renderSearchResults(models) {
+            if (models.length === 0) {
+                return '<p style="color: #8b949e;">No models found. Try different keywords.</p>';
+            }
+            
+            return models.map(model => `
+                <div class="model-card" onclick="selectModel('${model.id}', '${model.name}', '${model.description}')">
+                    <div class="model-id">${model.id}</div>
+                    <h4 class="model-name">${model.name}</h4>
+                    <p class="model-desc">${model.description}</p>
+                </div>
+            `).join('');
+        }
+
+        function selectModel(modelId, modelName, modelDesc) {
+            const executionSection = document.getElementById('execution-section');
+            const predictionSection = document.getElementById('prediction-status-section');
+            
+            document.getElementById('detail-model-id').textContent = 'Selected Model: ' + modelId;
+            document.getElementById('detail-model-name').textContent = modelName;
+            document.getElementById('detail-description').textContent = modelDesc;
+            
+            // Reset form
+            document.getElementById('dynamic-inputs').innerHTML = '';
+            setupMockFormData(modelId);
+            
+            executionSection.classList.remove('hidden');
+            showPredictionSectionIfReady();
+        }
+
+        function setupMockFormData(modelId) {
+            const inputsContainer = document.getElementById('dynamic-inputs');
+            
+            let formData;
+            if (modelId.includes('stable-diffusion')) {
+                formData = [
+                    { name: 'prompt', type: 'text', label: 'Prompt', placeholder: 'Describe the image you want to generate' },
+                    { name: 'num_inference_steps', type: 'number', label: 'Inference Steps (5-50)', default: 50 }
+                ];
+            } else if (modelId.includes('llama')) {
+                formData = [
+                    { name: 'prompt', type: 'text', label: 'Prompt', placeholder: 'Enter your message to the AI' },
+                    { name: 'temperature', type: 'number', label: 'Temperature (0-2)', default: 0.7 }
+                ];
+            } else {
+                formData = [
+                    { name: 'text', type: 'text', label: 'Input Text', placeholder: 'Text to process' },
+                    { name: 'parameters', type: 'textarea', label: 'Parameters (JSON)', rows: 4 }
+                ];
+            }
+            
+            inputsContainer.innerHTML = formData.map(field => `
+                <div class="form-group">
+                    <label for="${field.name}">${field.label}</label>
+                    ${field.type === 'textarea' 
+                        ? `<textarea id="${field.name}" name="${field.name}" placeholder="${field.placeholder || ''}" rows="${field.rows || 4}"></textarea>`
+                        : field.type === 'number'
+                        ? `<input type="number" id="${field.name}" name="${field.name}" value="${field.default || ''}" step="step"/>`
+                        : `<input type="text" id="${field.name}" name="${field.name}" placeholder="${field.placeholder || ''}"/>`
+                    }
+                </div>
+            `).join('');
+        }
+
+        async function handlePredictionSubmit(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('btn-run-prediction');
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+            
+            try {
+                // Collect form data
+                const formData = {};
+                document.querySelectorAll('#dynamic-inputs input, #dynamic-inputs textarea').forEach(input => {
+                    formData[input.name] = input.value;
+                });
+                
+                // Call via MCP - simulated for UI demo
+                showLoader();
+                
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
+                
+                const mockPredictionId = 'pred_' + Math.random().toString(36).substring(7);
+                
+                state.recentPredictions.unshift({
+                    id: mockPredictionId,
+                    status: 'processing',
+                    model_id: state.selectedModel?.id || 'unknown',
+                    created_at: new Date().toISOString(),
+                    logs: [],
+                    output_preview: null
+                });
+                
+                displayPredictionResults(mockPredictionId);
+                showRecentPredictions();
+                
+                // Poll for completion (simulated)
+                pollPrediction(mockPredictionId);
+                
+            } catch (error) {
+                btn.disabled = false;
+                btn.textContent = 'Run Model';
+                showAlert(error.message || 'Failed to run prediction', 'error');
+            } finally {
+                hideLoader();
+            }
+        }
+
+        function pollPrediction(predictionId, attempts = 0, maxAttempts = 9) {
+            if (attempts >= maxAttempts) return;
+            
+            setTimeout(async () => {
+                try {
+                    const predictions = document.querySelectorAll('.prediction-item[id^="pred-"]');
+                    const predictionElement = [...predictions].find(p => p.getAttribute('data-id') === predictionId);
+                    
+                    if (!predictionElement) return;
+                    
+                    // Simulate state transition
+                    const statusEl = predictionElement.querySelector('.status-badge');
+                    if (attempts < maxAttempts - 2) {
+                        statusEl.className = 'status-badge';
+                        statusEl.style.background = '#2d3e50';
+                        statusEl.style.color = '#c9d1d9';
+                        statusEl.textContent = '⏳ Processing...';
+                    } else if (attempts < maxAttempts - 1) {
+                        statusEl.className = 'status-badge';
+                        statusEl.style.background = '#3a2c5a';
+                        statusEl.style.color = '#d0a9fa';
+                        statusEl.textContent = '🔄 Finalizing...';
+                    } else {
+                        statusEl.className = 'status-badge';
+                        statusEl.style.background = '#1a4731';
+                        statusEl.style.color = '#7ee787';
+                        statusEl.textContent = '✅ Succeeded';
+                        
+                        const previewEl = predictionElement.querySelector('#preview-preview');
+                        previewEl.classList.remove('output-preview');
+                        previewEl.textContent = '🖼️ Sample output generated successfully!';
+                    }
+                    
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 2000 / (attempts + 1));
+        }
+
+        async function checkPredictionStatus() {
+            const predictionId = document.getElementById('prediction-id-input').value.trim();
+            if (!predictionId) return;
+            
+            showLoader();
+            
+            try {
+                // Simulate status fetch
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const mockStatus = {
+                    prediction_id: predictionId,
+                    status: 'Succeeded',
+                    created_at: new Date(Date.now() - 3600000).toISOString(),
+                    completed_at: new Date().toISOString(),
+                    output_preview: 'Sample generated output preview...',
+                    logs: '[INFO] Prediction completed successfully'
+                };
+                
+                displayPredictionResults(predictionId, mockStatus);
+            } catch (error) {
+                showAlert('Failed to fetch prediction status', 'error');
+            } finally {
+                hideLoader();
+            }
+        }
+
+        function displayPredictionResults(predictionId, extraData = {}) {
+            const section = document.getElementById('prediction-status-section');
+            section.classList.remove('hidden');
+            showPredictionSectionIfReady();
+            
+            const resultDiv = document.getElementById('prediction-status-result');
+            
+            let content = `
+                <div class="card">
+                    <h4 id="preview-model-id" style="color: #7ee787;"></h4>
+                    <p><strong>Status:</strong> <span id="preview-status"></span></p>
+                    <p><strong>Created:</strong> <span id="preview-created"></span></p>
+                    ${extraData.completed_at ? `<p><strong>Completed:</strong> <span id="preview-completed"></span></p>` : ''}
+                    <div id="preview-logs" class="code-block" style="margin-top: 1rem;"></div>
+                    <p><strong>Output:</strong></p>
+                    <pre id="output-preview" class="code-block output-preview">${extraData.output_preview || 'Waiting for output...'}</pre>
+                </div>
+            `;
+            
+            resultDiv.innerHTML = content;
+            document.getElementById('preview-model-id').textContent = predictionId;
+        }
+
+        function showRecentPredictions() {
+            const historyDiv = document.getElementById('recent-predictions');
+            
+            if (state.recentPredictions.length === 0) {
+                historyDiv.innerHTML = '<p style="color: #8b949e;">No predictions yet.</p>';
+                return;
+            }
+            
+            historyDiv.innerHTML = state.recentPredictions.slice(0, 5).map(p => `
+                <div class="prediction-item" data-id="${p.id}">
+                    <h4 style="color: #c9d1d9;">${p.id}</h4>
+                    <p class="model-desc">${p.model_id}</p>
+                    <div class="prediction-meta">
+                        <span>Status: ${p.status}</span>
+                        <span>ID: ${p.id.substring(0, 16)}...</span>
+                        <span>Created: ${new Date(p.created_at).toLocaleTimeString()}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('prediction-id-input').value = state.recentPredictions[0].id;
+        }
+
+        function showPredictionSectionIfReady() {
+            const execSection = document.getElementById('execution-section');
+            if (execSection.classList.contains('hidden')) return;
+            
+            const predictionSection = document.getElementById('prediction-status-section');
+            predictionSection.classList.remove('hidden');
+        }
+
+        function showAlert(message, type = 'error') {
+            const container = document.querySelector('.container');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            
+            // Prepend to container header
+            container.insertBefore(alertDiv, container.children[1]);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        // Make functions globally available for inline event handlers
+        window.searchModels = searchModels;
+        window.selectModel = selectModel;
+        window.handlePredictionSubmit = handlePredictionSubmit;
+        window.pollPrediction = pollPrediction;
+        window.checkPredictionStatus = checkPredictionStatus;
+        window.showRecentPredictions = showRecentPredictions;
+        window.displayPredictionResults = displayPredictionResults;
+    </script>
+</body>
+</html>
