@@ -57,8 +57,6 @@ def get_license_status() -> LicenseStatus:
             return _license_cache
 
     # No valid cache; perform fresh validation
-    from jose.exceptions import PyJWKError
-
     from app.config import settings
 
     key = settings.LICENSE_KEY.strip() if hasattr(settings, "LICENSE_KEY") else ""
@@ -119,7 +117,7 @@ def get_license_status() -> LicenseStatus:
             activation_date=datetime.now(UTC),
         )
 
-    except (PyJWKError, ValueError, KeyError, JWTError) as exc:
+    except (ValueError, KeyError, JWTError) as exc:
         _license_cache = LicenseStatus(
             valid=False,
             key=key[:16] + "..." if len(key) > 8 else "",
