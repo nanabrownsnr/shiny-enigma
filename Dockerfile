@@ -26,8 +26,9 @@ RUN apt-get update && apt-get install -y \
     libffi8 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages from builder
-COPY --from=builder /build/.venv /usr/local
+# Copy the isolated environment without overwriting the base image's Python
+# installation and symlink chain.
+COPY --from=builder /build/.venv /opt/venv
 
 # Copy application code
 COPY ./app /app/app
@@ -36,6 +37,7 @@ COPY pyproject.toml README.md uv.lock ./
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Create logs directory
 RUN mkdir -p /app/logs
