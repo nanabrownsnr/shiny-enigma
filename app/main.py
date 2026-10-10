@@ -24,6 +24,7 @@ from app.config import settings
 from app.connection_store import ConnectionStore, set_active_store
 from app.license import license_watcher
 from app.tools.replicate import register_tools
+from app.twynity import ReplicateMCPStarlette
 from app.usage import save_usage_report
 
 logger = getLogger(__name__)
@@ -126,7 +127,7 @@ middleware = [
 ]
 
 # Create the ASGI application with middleware
-app = mcp.http_app(middleware=middleware)
+app = ReplicateMCPStarlette(mcp.http_app(middleware=middleware))
 
 
 if __name__ == "__main__":

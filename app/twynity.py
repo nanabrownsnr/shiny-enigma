@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.routing import Route
+from starlette.routing import Mount, Route
 
 from app.config import settings
 
@@ -18,8 +18,7 @@ from app.config import settings
 class ReplicateMCPStarlette(Starlette):
     """Custom Starlette app hosting Twynity routes alongside MCP endpoints."""
 
-    def __init__(self, mcp_app, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, mcp_app):
 
         # Add custom Twynity routes to the application routing
 
@@ -35,7 +34,10 @@ class ReplicateMCPStarlette(Starlette):
         ]
 
         # Insert custom routes at the beginning (before FastMCP's routes)
-        self.routes = custom_routes + list(self.routes)
+        super().__init__(
+            routes=custom_routes + [Mount("/", app=mcp_app)],
+            lifespan=mcp_app.router.lifespan_context,
+        )
 
     async def handle_health(self, request: Request) -> JSONResponse:
         """Health check endpoint for container orchestrators."""
@@ -156,18 +158,4 @@ def register_routes(mcp):
     It wraps the original MCP app in our custom Starlette implementation
     that adds the required Twynity endpoints.
     """
-    # Create custom routes for Twynity's expectations
-    from starlette.responses import JSONResponse
-
-    async def health_check(request: Request) -> JSONResponse:
-        return JSONResponse(
-            {
-                "status": "running",
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
-        )
-
-    # Return a wrapped application that includes both FastMCP routes and custom ones
-    # The actual routing happens inside the ReplicateMCPStarlette class above
-
-    return ReplicateMCPStarlette(routes=[])
+    return ReplicateMCPStarlette(mcp.http_app())
