@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /build
 
 # Copy dependency files
-COPY pyproject.toml .
+COPY pyproject.toml README.md uv.lock ./
 
 # Build and install dependencies using uv (or pip as fallback)
 RUN pip install --no-cache-dir uv 2>/dev/null || true
@@ -31,7 +31,7 @@ COPY --from=builder /build/.venv /usr/local
 
 # Copy application code
 COPY ./app /app/app
-COPY pyproject.toml .
+COPY pyproject.toml README.md uv.lock ./
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
