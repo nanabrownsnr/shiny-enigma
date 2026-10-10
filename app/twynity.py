@@ -24,7 +24,7 @@ class ReplicateMCPStarlette(Starlette):
         # Add custom Twynity routes to the application routing
 
         custom_routes = [
-            Route("/health", self.handle_health, methods=["GET"]),
+            Route("/api/v1/health", self.handle_health, methods=["GET"]),
             Route("/version", self.handle_version, methods=["GET"]),
             Route("/api/v1/manifest", self.handle_manifest, methods=["GET"]),
             Route(
